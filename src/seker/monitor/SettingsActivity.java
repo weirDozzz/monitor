@@ -1,5 +1,7 @@
-
-package com.baidu.searchbox.util.monitor;
+/*
+ * Copyright (C) 2013 Baidu Inc. All rights reserved.
+ */
+package seker.monitor;
 
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;

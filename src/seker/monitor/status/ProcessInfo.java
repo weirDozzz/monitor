@@ -1,5 +1,7 @@
-
-package com.baidu.searchbox.util.monitor.status;
+/*
+ * Copyright (C) 2013 Baidu Inc. All rights reserved.
+ */
+package seker.monitor.status;
 
 import java.util.ArrayList;
 import java.util.List;

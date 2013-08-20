@@ -1,4 +1,7 @@
-package com.baidu.searchbox.util.monitor.status;
+/*
+ * Copyright (C) 2013 Baidu Inc. All rights reserved.
+ */
+package seker.monitor.status;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -8,10 +11,11 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 
+import seker.monitor.MonitorService;
+
 import android.content.Context;
 import android.util.Log;
 
-import com.baidu.searchbox.util.monitor.MonitorService;
 
 public class CpuInfo {
 

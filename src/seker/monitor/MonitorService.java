@@ -1,5 +1,7 @@
-
-package com.baidu.searchbox.util.monitor;
+/*
+ * Copyright (C) 2013 Baidu Inc. All rights reserved.
+ */
+package seker.monitor;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -13,8 +15,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 
-import seker.monitor.MonitorApp;
 import seker.monitor.R;
+import seker.monitor.status.CpuInfo;
+import seker.monitor.status.MemoryInfo;
 import android.app.Activity;
 import android.app.Service;
 import android.content.Context;
@@ -36,15 +39,13 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.baidu.searchbox.util.monitor.status.CpuInfo;
-import com.baidu.searchbox.util.monitor.status.MemoryInfo;
 
 public class MonitorService extends Service {
 
 	private final static String TAG = "MonitorService";
 
 	private WindowManager windowManager = null;
-	private WindowManager.LayoutParams wmParams = null;
+	private WindowManager.LayoutParams wmParams = new WindowManager.LayoutParams();;
 	private View viFloatingWindow;
 	private float mTouchStartX;
 	private float mTouchStartY;
@@ -198,7 +199,6 @@ public class MonitorService extends Service {
 		editor.commit();
 		windowManager = (WindowManager) getApplicationContext()
 				.getSystemService("window");
-		wmParams = ((MonitorApp) getApplication()).getMywmParams();
 		wmParams.type = 2002;
 		wmParams.flags |= 8;
 		wmParams.gravity = Gravity.LEFT | Gravity.TOP;
