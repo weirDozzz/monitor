@@ -19,5 +19,21 @@
     <string name="ok">保存</string>
     <string name="openwifi">开启wifi</string>
     <string name="closewifi">关闭wifi</string>
+    
+    <string name="select_app">请选择需要测试的应用程序</string>
+    <string name="monitor_result">测试结果文件：</string>
+    
+    <string name="dialog_title">提示</string>
+    <string name="dialog_content">确定退出程序？</string>
+    <string name="ok">确定</string>
+    <string name="cancel">取消</string>
+    
+    <string name="exit">退出</string>
+    <string name="option">设置</string>
+    
+    <string name="running">正在运行</string>
+    <string name="not_running">尚未运行</string>
+    <string name="test_start">开始测试</string>
+    <string name="test_end">停止测试</string>
 
 </resources>

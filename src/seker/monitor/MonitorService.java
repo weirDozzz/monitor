@@ -9,13 +9,13 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.io.RandomAccessFile;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 
 import seker.monitor.R;
+import seker.monitor.process.ProcessInfo;
 import seker.monitor.status.CpuInfo;
 import seker.monitor.status.MemoryInfo;
 import android.app.Activity;
@@ -66,13 +66,16 @@ public class MonitorService extends Service {
 	private CpuInfo cpuInfo;
 	private String time;
 	private boolean isFloating;
-	private String processName, packageName, settingTempFile;
-	private int pid, uid;
-
+	/** 正在测试的APP Info */
+    private ProcessInfo mCurProcessInfo;
+	
 	public static BufferedWriter bw;
 	public static FileOutputStream out;
 	public static OutputStreamWriter osw;
 	public static String resultFilePath;
+	
+    /**传递ProcessInfo的key*/
+    public static final String KEY_PROCESS_INFO = "key_process_info";
 
 	@Override
 	public void onCreate() {
@@ -90,14 +93,9 @@ public class MonitorService extends Service {
 		setForeground(true);
 		super.onStart(intent, startId);
 
-		pid = intent.getExtras().getInt("pid");
-		uid = intent.getExtras().getInt("uid");
-		processName = intent.getExtras().getString("processName");
-		packageName = intent.getExtras().getString("packageName");
-		settingTempFile = intent.getExtras().getString("settingTempFile");
+		mCurProcessInfo = (ProcessInfo) intent.getExtras().getSerializable(KEY_PROCESS_INFO);
 
-		cpuInfo = new CpuInfo(getBaseContext(), pid, Integer.toString(uid));
-		readSettingInfo(intent);
+		cpuInfo = new CpuInfo(getBaseContext(), mCurProcessInfo.getPid(), Integer.toString(mCurProcessInfo.getUid()));
 		delaytime = Integer.parseInt(time) * 1000;
 		if (isFloating) {
 			viFloatingWindow = LayoutInflater.from(this).inflate(
@@ -128,25 +126,6 @@ public class MonitorService extends Service {
 	}
 
 	/**
-	 * read configuration file
-	 * 
-	 * @throws IOException
-	 */
-	private void readSettingInfo(Intent intent) {
-		try {
-			RandomAccessFile raf = new RandomAccessFile(new File(
-					settingTempFile), "r");
-			time = raf.readLine();
-			isFloating = raf.readLine().equals("true") ? true : false;
-			raf.close();
-		} catch (IOException e) {
-			time = "5";
-			isFloating = true;
-			Log.e(TAG, e.getMessage());
-		}
-	}
-
-	/**
 	 * write the test result to csv format report
 	 */
 	private void createResultCsv() {
@@ -173,13 +152,13 @@ public class MonitorService extends Service {
 			bw = new BufferedWriter(osw);
 			long totalMemorySize = memoryInfo.getTotalMemory();
 			String totalMemory = fomart.format((double) totalMemorySize / 1024);
-			bw.write("指定应用的CPU内存监控情况\r\n" + "应用包名：," + packageName + "\r\n"
-					+ "应用名称: ," + processName + "\r\n" + "应用PID: ," + pid
+			bw.write("指定应用的CPU内存监控情况\r\n" + "应用包名：," + mCurProcessInfo.getPackageName() + "\r\n"
+					+ "应用名称: ," + mCurProcessInfo.getProcessName() + "\r\n" + "应用PID: ," + mCurProcessInfo.getPid()
 					+ "\r\n" + "机器内存大小(MB)：," + totalMemory + "MB\r\n"
 					+ "机器CPU型号：," + cpuInfo.getCpuName() + "\r\n"
 					+ "机器android系统版本：," + memoryInfo.getSDKVersion() + "\r\n"
 					+ "手机型号：," + memoryInfo.getPhoneType() + "\r\n" + "UID：,"
-					+ uid + "\r\n");
+					+ mCurProcessInfo.getUid() + "\r\n");
 			bw.write("时间" + "," + "应用占用内存PSS(MB)" + "," + "应用占用内存比(%)" + ","
 					+ " 机器剩余内存(MB)" + "," + "应用占用CPU率(%)" + "," + "CPU总使用率(%)"
 					+ "," + "流量(KB)：" + "\r\n");
@@ -291,7 +270,7 @@ public class MonitorService extends Service {
 	 * @throws IOException
 	 */
 	private void dataRefresh() {
-		int pidMemory = memoryInfo.getPidMemorySize(pid, getBaseContext());
+		int pidMemory = memoryInfo.getPidMemorySize(mCurProcessInfo.getPid(), getBaseContext());
 		long freeMemory = memoryInfo.getFreeMemorySize(getBaseContext());
 		String freeMemoryKb = fomart.format((double) freeMemory / 1024);
 		String processMemory = fomart.format((double) pidMemory / 1024);
