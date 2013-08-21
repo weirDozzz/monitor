@@ -11,8 +11,8 @@ import java.io.OutputStreamWriter;
 import java.util.List;
 
 import seker.common.BaseActivity;
-import seker.monitor.status.ProcessInfo;
-import seker.monitor.status.Programe;
+import seker.monitor.process.ProcessInfo;
+import seker.monitor.process.ProcessUtils;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -45,17 +45,15 @@ import android.widget.Toast;
  */
 public class MonitorActivity extends BaseActivity {
 
-    /**Log Switch*/
+    /** Log Switch */
     private static final String TAG = "MonitorActivity";
 
+    /** 启动一个APP，等待其启动完成的Time out时间 */
     private static final int TIMEOUT = 20000;
 
+    /** 用于启动/停止MonitorService的Intent */
     private Intent mMonitorServiceIntent;
-    
-    private List<Programe> mProcessList;
-    private ProcessInfo processInfo;
-    
-    
+
     private ListView lstViProgramme;
     private Button btnTest;
     private boolean isTesting = true;
@@ -67,25 +65,20 @@ public class MonitorActivity extends BaseActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-//        // Full Screen
-//        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         
         setContentView(R.layout.mainpage);
         createNewFile();
-        processInfo = new ProcessInfo();
         lstViProgramme = (ListView) findViewById(R.id.processList);
         btnTest = (Button) findViewById(R.id.test);
-        lstViProgramme.setAdapter(new ListAdapter());
+        lstViProgramme.setAdapter(new ProcessListAdapter());
         btnTest.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 mMonitorServiceIntent = new Intent();
-                mMonitorServiceIntent.setClass(MonitorActivity.this,
-                        MonitorService.class);
+                mMonitorServiceIntent.setClass(MonitorActivity.this, MonitorService.class);
                 if (isTesting) {
                     if (isRadioChecked == true) {
-                        Intent intent = getPackageManager()
-                                .getLaunchIntentForPackage(packageName);
+                        Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
                         Log.d(TAG, packageName);
                         startActivity(intent);
                         waitForAppStart(packageName);
@@ -93,21 +86,18 @@ public class MonitorActivity extends BaseActivity {
                         mMonitorServiceIntent.putExtra("pid", pid);
                         mMonitorServiceIntent.putExtra("uid", uid);
                         mMonitorServiceIntent.putExtra("packageName", packageName);
-                        mMonitorServiceIntent.putExtra("settingTempFile",
-                                settingTempFile);
+                        mMonitorServiceIntent.putExtra("settingTempFile", settingTempFile);
                         startService(mMonitorServiceIntent);
                         btnTest.setText("停止测试");
                         isTesting = false;
                     } else {
-                        Toast.makeText(MonitorActivity.this, "请选择需要测试的应用程序",
-                                Toast.LENGTH_LONG).show();
+                        Toast.makeText(MonitorActivity.this, "请选择需要测试的应用程序", Toast.LENGTH_LONG).show();
                     }
                 } else {
                     btnTest.setText("开始测试");
                     isTesting = true;
-                    Toast.makeText(MonitorActivity.this,
-                            "测试结果文件：" + MonitorService.resultFilePath,
-                            Toast.LENGTH_LONG).show();
+                    Toast.makeText(MonitorActivity.this, "测试结果文件：" + MonitorService.resultFilePath, Toast.LENGTH_LONG)
+                            .show();
                     stopService(mMonitorServiceIntent);
                 }
             }
@@ -119,14 +109,12 @@ public class MonitorActivity extends BaseActivity {
      */
     private void createNewFile() {
         Log.i(TAG, "create new file to save setting data");
-        settingTempFile = getBaseContext().getFilesDir().getPath()
-                + "\\Emmagee_Settings.txt";
+        settingTempFile = getBaseContext().getFilesDir().getPath() + "\\Emmagee_Settings.txt";
         File settingFile = new File(settingTempFile);
-        if (!settingFile.exists()) 
+        if (!settingFile.exists())
             try {
                 settingFile.createNewFile();
-                BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(
-                        new FileOutputStream(settingFile)));
+                BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(settingFile)));
                 bw.write("5" + "\r\n" + "true");
                 bw.close();
             } catch (IOException e) {
@@ -138,20 +126,19 @@ public class MonitorActivity extends BaseActivity {
      * wait for test application started , timeout is 20s
      * 
      * @param packageName
-     *             package name of test application
+     *            package name of test application
      */
     private void waitForAppStart(String packageName) {
         Log.d(TAG, "wait for app start");
         boolean isProcessStarted = false;
         long startTime = System.currentTimeMillis();
         while (System.currentTimeMillis() < startTime + TIMEOUT) {
-            mProcessList = processInfo.getRunningProcess(getBaseContext());
-            for (Programe programe : mProcessList) {
-                if ((programe.getPackageName() != null)
-                        && (programe.getPackageName().equals(packageName))) {
-                    pid = programe.getPid();
+            List<ProcessInfo> processes = ProcessUtils.getRunningProcess(getBaseContext());
+            for (ProcessInfo processInfo : processes) {
+                if ((processInfo.getPackageName() != null) && (processInfo.getPackageName().equals(packageName))) {
+                    pid = processInfo.getPid();
                     Log.d(TAG, "pid:" + pid);
-                    uid = programe.getUid();
+                    uid = processInfo.getUid();
                     if (pid != 0) {
                         isProcessStarted = true;
                         break;
@@ -164,7 +151,7 @@ public class MonitorActivity extends BaseActivity {
     }
 
     /**
-     * override return key to show a dialog 
+     * override return key to show a dialog
      */
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK && event.getRepeatCount() == 0) {
@@ -208,55 +195,51 @@ public class MonitorActivity extends BaseActivity {
     protected Dialog onCreateDialog(int id) {
         switch (id) {
         case 0:
-            return new AlertDialog.Builder(this)
-                    .setTitle("确定退出程序？")
-                    .setPositiveButton(
-                            "确定",
-                            new android.content.DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog,
-                                        int which) {
-                                    if (mMonitorServiceIntent != null) {
-                                        Log.d(TAG, "stop service");
-                                        stopService(mMonitorServiceIntent);
-                                    }
-                                    Log.d(TAG, "exit Emmagee");
-                                    MonitorService.closeOpenedStream();
-                                    finish();
-                                    System.exit(0);
-                                }
-                            }).setNegativeButton("取消", null).create();
+            return new AlertDialog.Builder(this).setTitle("确定退出程序？")
+                    .setPositiveButton("确定", new android.content.DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            if (mMonitorServiceIntent != null) {
+                                Log.d(TAG, "stop service");
+                                stopService(mMonitorServiceIntent);
+                            }
+                            Log.d(TAG, "exit Emmagee");
+                            MonitorService.closeOpenedStream();
+                            finish();
+                            System.exit(0);
+                        }
+                    }).setNegativeButton("取消", null).create();
         default:
             return null;
         }
     }
 
     /**
-     * customizing adapter
-     * 
+     * Customizing process adapter
      */
-    private class ListAdapter extends BaseAdapter {
-        List<Programe> programe;
+    private class ProcessListAdapter extends BaseAdapter {
+        List<ProcessInfo> mProcessInfoList;
         int tempPosition = -1;
 
-        class Viewholder {
-            TextView txtAppName;
-            ImageView imgViAppIcon;
-            RadioButton rdoBtnApp;
+        class ViewHolder {
+            RadioButton rdBtn;
+            ImageView appIcon;
+            TextView appName;
+            TextView isRunning;
         }
 
-        public ListAdapter() {
-            programe = processInfo.getRunningProcess(getBaseContext());
+        public ProcessListAdapter() {
+            mProcessInfoList = ProcessUtils.getRunningProcess(getBaseContext());
         }
 
         @Override
         public int getCount() {
-            return programe.size();
+            return mProcessInfoList.size();
         }
 
         @Override
         public Object getItem(int position) {
-            return programe.get(position);
+            return mProcessInfoList.get(position);
         }
 
         @Override
@@ -266,47 +249,54 @@ public class MonitorActivity extends BaseActivity {
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            Viewholder holder = new Viewholder();
+            if (null == convertView) {
+                convertView = buildView();
+            }
+            
+            ViewHolder holder = (ViewHolder) convertView.getTag();
             final int i = position;
-            convertView = MonitorActivity.this.getLayoutInflater().inflate(
-                    R.layout.list_item, null);
-            holder.imgViAppIcon = (ImageView) convertView
-                    .findViewById(R.id.image);
-            holder.txtAppName = (TextView) convertView.findViewById(R.id.text);
-            holder.rdoBtnApp = (RadioButton) convertView.findViewById(R.id.rb);
-            holder.rdoBtnApp.setId(position);
-            holder.rdoBtnApp
-                    .setOnCheckedChangeListener(new OnCheckedChangeListener() {
-                        @Override
-                        public void onCheckedChanged(CompoundButton buttonView,
-                                boolean isChecked) {
-                            if (isChecked) {
-                                isRadioChecked = true;
-                                // Radio function
-                                if (tempPosition != -1) {
-                                    RadioButton tempButton = (RadioButton) findViewById(tempPosition);
-                                    if ((tempButton != null)
-                                            && (tempPosition != i)) {
-                                        tempButton.setChecked(false);
-                                    }
-                                }
-
-                                tempPosition = buttonView.getId();
-                                packageName = programe.get(tempPosition)
-                                        .getPackageName();
-                                processName = programe.get(tempPosition)
-                                        .getProcessName();
+            convertView = MonitorActivity.this.getLayoutInflater().inflate(R.layout.process_list_item, null);
+            holder.rdBtn.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                    if (isChecked) {
+                        isRadioChecked = true;
+                        // Radio function
+                        if (tempPosition != -1) {
+                            RadioButton tempButton = (RadioButton) findViewById(tempPosition);
+                            if ((tempButton != null) && (tempPosition != i)) {
+                                tempButton.setChecked(false);
                             }
                         }
-                    });
+
+                        tempPosition = buttonView.getId();
+                        packageName = mProcessInfoList.get(tempPosition).getPackageName();
+                        processName = mProcessInfoList.get(tempPosition).getProcessName();
+                    }
+                }
+            });
             if (tempPosition == position) {
-                if (!holder.rdoBtnApp.isChecked())
-                    holder.rdoBtnApp.setChecked(true);
+                if (!holder.rdBtn.isChecked())
+                    holder.rdBtn.setChecked(true);
             }
-            Programe pr = (Programe) programe.get(position);
-            holder.imgViAppIcon.setImageDrawable(pr.getIcon());
-            holder.txtAppName.setText(pr.getProcessName());
+            ProcessInfo pr = (ProcessInfo) mProcessInfoList.get(position);
+            holder.appIcon.setImageDrawable(pr.getIcon());
+            holder.appName.setText(pr.getProcessName());
             return convertView;
+        }
+        
+        private View buildView() {
+            View view = getLayoutInflater().inflate(R.layout.process_list_item, null);
+            
+            ViewHolder holder = new ViewHolder();
+            view.setTag(holder);
+            
+            holder.rdBtn = (RadioButton) view.findViewById(R.id.rb);
+            holder.appName = (TextView) view.findViewById(R.id.name);
+            holder.isRunning = (TextView) view.findViewById(R.id.running);
+            holder.appIcon = (ImageView) view.findViewById(R.id.image);
+            
+            return view;
         }
     }
 }
