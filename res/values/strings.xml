@@ -21,6 +21,7 @@
     <string name="closewifi">关闭wifi</string>
     
     <string name="select_app">请选择需要测试的应用程序</string>
+    <string name="select_fail_start">您选择的测试应用程序无法调起！</string>
     <string name="monitor_result">测试结果文件：</string>
     
     <string name="dialog_title">提示</string>

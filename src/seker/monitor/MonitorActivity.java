@@ -8,7 +8,6 @@ import java.util.List;
 import seker.common.BaseActivity;
 import seker.monitor.process.ProcessInfo;
 import seker.monitor.process.ProcessUtils;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
@@ -59,6 +58,9 @@ public class MonitorActivity extends BaseActivity implements OnCheckedChangeList
     
     /** Dialog ID */
     private static final int DIALOG_ID = 1024;
+    
+    /** Adapter */
+    private ProcessListAdapter mAdapter;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -70,8 +72,8 @@ public class MonitorActivity extends BaseActivity implements OnCheckedChangeList
         ListView listview = (ListView) findViewById(R.id.list);
         listview.setCacheColorHint(Color.TRANSPARENT);
         List<ProcessInfo> processes = ProcessUtils.getRunningProcess(getApplicationContext());
-        ProcessListAdapter adapter = new ProcessListAdapter(getApplicationContext(), processes, this);
-        listview.setAdapter(adapter);
+        mAdapter = new ProcessListAdapter(getApplicationContext(), processes, this);
+        listview.setAdapter(mAdapter);
     }
 
     @Override
@@ -80,6 +82,10 @@ public class MonitorActivity extends BaseActivity implements OnCheckedChangeList
         if (isTesting) {
             if (null != mCurProcessInfo) {
                 Intent intent = getPackageManager().getLaunchIntentForPackage(mCurProcessInfo.getPackageName());
+                if (null == intent) {
+                    Toast.makeText(MonitorActivity.this, R.string.select_fail_start, Toast.LENGTH_LONG).show();
+                    return;
+                }
                 startActivity(intent);
                 waitForAppStart(mCurProcessInfo.getPackageName());
                 
@@ -195,20 +201,35 @@ public class MonitorActivity extends BaseActivity implements OnCheckedChangeList
     @Override
     public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
         ProcessInfo info = (ProcessInfo) buttonView.getTag();
-        info.setIsSelected(isChecked);
-        mCurProcessInfo = isChecked ? info : null;
+        if (info.isSelected() != isChecked) {
+            info.setIsSelected(isChecked);
+            if (isChecked) {
+                if (null != mCurProcessInfo && !mCurProcessInfo.equals(info)) {
+                    mCurProcessInfo.setIsSelected(false);
+                    mAdapter.notifyDataSetChanged();
+                }
+                mCurProcessInfo = info;
+            } else {
+                mCurProcessInfo = null;
+            }
+        }
     }
 }
 
 /**
- * Customizing process adapter
+ * Customizing process mAdapter
  * 
  * @author liuxinjian
  * @since 2013-8-21
  */
 class ProcessListAdapter extends BaseAdapter {
+    /** Context*/
     private Context mContext;
+
+    /** Process 列表 */
     private List<ProcessInfo> mProcessInfoList;
+    
+    /** RadioButton的OnCheckedChangeListener */
     private OnCheckedChangeListener mListener;
 
     public ProcessListAdapter(Context context, List<ProcessInfo> infoList, OnCheckedChangeListener listener) {
@@ -237,13 +258,15 @@ class ProcessListAdapter extends BaseAdapter {
         ProcessInfo info = (ProcessInfo) mProcessInfoList.get(position);
 
         if (null == convertView) {
-            convertView = buildView(mContext, mListener);
+            convertView = buildView(mContext, parent, mListener);
         }
 
         ViewHolder holder = (ViewHolder) convertView.getTag();
 
-        holder.rdBtn.setChecked(info.isSelected());
         holder.rdBtn.setTag(info);
+        if (info.isSelected() != holder.rdBtn.isChecked()) {
+            holder.rdBtn.setChecked(info.isSelected());
+        }
         holder.appIcon.setImageDrawable(info.getIcon());
         holder.appName.setText(info.getProcessName());
         holder.isRunning.setText(info.isRuning() ? R.string.running : R.string.not_running);
@@ -251,8 +274,8 @@ class ProcessListAdapter extends BaseAdapter {
         return convertView;
     }
 
-    private View buildView(Context context, OnCheckedChangeListener listener) {
-        View view = LayoutInflater.from(context).inflate(R.layout.process_list_item, null);
+    private View buildView(Context context, ViewGroup parent, OnCheckedChangeListener listener) {
+        View view = LayoutInflater.from(context).inflate(R.layout.process_list_item, parent, false);
 
         ViewHolder holder = new ViewHolder();
         view.setTag(holder);

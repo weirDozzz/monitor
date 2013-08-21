@@ -18,7 +18,6 @@
         android:id="@+id/list"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_above="@id/test"
-        android:dividerHeight="2dp" />
+        android:layout_above="@id/test"/>
 
 </RelativeLayout>
