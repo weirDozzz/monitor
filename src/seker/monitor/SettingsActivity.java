@@ -3,124 +3,79 @@
  */
 package seker.monitor;
 
-import java.io.BufferedWriter;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.RandomAccessFile;
-
-import seker.monitor.R;
-import android.app.Activity;
-import android.content.Intent;
+import seker.common.BaseActivity;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 import android.os.Bundle;
-import android.util.Log;
+import android.preference.PreferenceManager;
+import android.text.TextUtils;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.Toast;
 
-
-public class SettingsActivity extends Activity {
-
-    private final String LOG_TAG = "SettingsActivity";
-    
-    private CheckBox chkFloat;
-    private EditText edtTime;
-    private String time;
-    private String settingTempFile;
+/**
+ * 设置Activity
+ * 
+ * @author liuxinjian
+ * @since 2013-8-22
+ */
+public class SettingsActivity extends BaseActivity implements OnClickListener {
+    /** 是否显示实时监控浮动框的key */
+    public static final String KEY_FLOAT = "key_float_checkbox";
+    /** 监控数据采样时间间隔的key */
+    public static final String KEY_TIME = "key_time_edittext";
+    /** 监控数据采样时间间隔最大值(单位为妙) */
+    public static final int MAX_DURATION = 600;
+    /** 监控数据采样时间间隔默认值(单位为妙) */
+    public static final int DEFAULT_DURATION = 5;
+    /** 是否显示实时监控浮动框 */
+    private CheckBox mFloatCkBox;
+    /** 实时监控数据采样时间间隔编辑框 */
+    private EditText mTimeEdt;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.i(LOG_TAG, "onCreate");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.settings);
 
-        Intent intent = this.getIntent();
-        settingTempFile = intent.getStringExtra("settingTempFile");
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        mFloatCkBox = (CheckBox) findViewById(R.id.floating);
+        mFloatCkBox.setChecked(sp.getBoolean(KEY_FLOAT, true));
+        mTimeEdt = (EditText) findViewById(R.id.time);
+        mTimeEdt.setText(String.valueOf(sp.getInt(KEY_TIME, DEFAULT_DURATION)));
+        mTimeEdt.setSelection(mTimeEdt.getText().toString().length());
         
-        chkFloat = (CheckBox) findViewById(R.id.floating);
-        edtTime = (EditText) findViewById(R.id.time);
-        Button btnSave = (Button) findViewById(R.id.save);
-        boolean floatingTag = true;
-
-        try {
-            RandomAccessFile raf = new RandomAccessFile(settingTempFile, "r");
-            String f = raf.readLine();
-            if (f == null || (f != null && f.equals(""))) {
-                time = "5";
-            } else
-                time = f;
-            String tag = raf.readLine();
-            if (tag != null && tag.equals("false"))
-                floatingTag = false;
-            raf.close();
-        } catch (FileNotFoundException e) {
-            Log.e(LOG_TAG,
-                    "FileNotFoundException: " + e.getMessage());
-            e.printStackTrace();
-        } catch (IOException e) {
-            Log.e(LOG_TAG, "IOException: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        edtTime.setText(time);
-        chkFloat.setChecked(floatingTag);
-        // edtTime.setInputType(InputType.TYPE_CLASS_NUMBER); 
-        btnSave.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                time = edtTime.getText().toString().trim();
-                if (!isNumeric(time)) {
-                    Toast.makeText(SettingsActivity.this, "输入数据无效，请重新输入",
-                            Toast.LENGTH_LONG).show();
-                    edtTime.setText("");
-                } else if (time.equals("") || Long.parseLong(time) == 0) {
-                    Toast.makeText(SettingsActivity.this, "输入数据为空,请重新输入",
-                            Toast.LENGTH_LONG).show();
-                    edtTime.setText("");
-                } else if (Integer.parseInt(time) > 600) {
-                    Toast.makeText(SettingsActivity.this, "数据超过最大值600，请重新输入",
-                            Toast.LENGTH_LONG).show();
-                } else {
-                    try {
-                        BufferedWriter bw = new BufferedWriter(
-                                new OutputStreamWriter(new FileOutputStream(
-                                        settingTempFile)));
-                        time = Integer.toString(Integer.parseInt(time));
-                        bw.write(time + "\r\n" + chkFloat.isChecked());
-                        bw.close();
-                        Toast.makeText(SettingsActivity.this, "保存成功",
-                                Toast.LENGTH_LONG).show();
-                        Intent intent = new Intent();
-                        setResult(Activity.RESULT_FIRST_USER, intent);
-                        SettingsActivity.this.finish();
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
-                    } catch (IOException e) {
-                        e.printStackTrace();
+        findViewById(R.id.save).setOnClickListener(this);
+    }
+    
+    @Override
+    public void onClick(View v) {
+        String str = mTimeEdt.getText().toString().trim();
+        if (!TextUtils.isEmpty(str)) {
+            if (TextUtils.isDigitsOnly(str)) {
+                try {
+                    int time = Integer.parseInt(str);
+                    if (time <= MAX_DURATION && time > 0) {
+                        Editor editor = PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).edit();
+                        editor.putBoolean(KEY_FLOAT, mFloatCkBox.isChecked());
+                        editor.putInt(KEY_TIME, time);
+                        Toast.makeText(SettingsActivity.this, R.string.valid_time, Toast.LENGTH_LONG).show();
+                        editor.commit();
+                        finish();
+                    } else {
+                        Toast.makeText(SettingsActivity.this, R.string.invalid_time3, Toast.LENGTH_LONG).show();
                     }
+                } catch (NumberFormatException e) {
+                    e.printStackTrace();
+                    Toast.makeText(SettingsActivity.this, R.string.invalid_time2, Toast.LENGTH_LONG).show();
                 }
+            } else {
+                Toast.makeText(SettingsActivity.this, R.string.invalid_time2, Toast.LENGTH_LONG).show();
             }
-        });
-    }
-
-    /**
-     * is input a number
-     * 
-     * @param inputStr
-     *            input string
-     * @return
-     */
-    private boolean isNumeric(String inputStr) {
-        for (int i = inputStr.length(); --i >= 0;) {
-            if (!Character.isDigit(inputStr.charAt(i))) {
-                return false;
-            }
+        } else {
+            Toast.makeText(SettingsActivity.this, R.string.invalid_time1, Toast.LENGTH_LONG).show();
         }
-        return true;
     }
-
 }
