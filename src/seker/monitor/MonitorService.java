@@ -17,7 +17,7 @@ import java.util.Calendar;
 import seker.monitor.R;
 import seker.monitor.process.ProcessInfo;
 import seker.monitor.status.CpuInfo;
-import seker.monitor.status.MemoryInfo;
+import seker.monitor.status.MemoryUtils;
 import android.app.Activity;
 import android.app.Service;
 import android.content.Context;
@@ -26,6 +26,7 @@ import android.content.SharedPreferences;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.os.IBinder;
+import android.preference.PreferenceManager;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -45,7 +46,6 @@ import android.widget.Toast;
  * @since 2013-8-22
  */
 public class MonitorService extends Service {
-
     /** WindowManager */
     private WindowManager mWindowManager;
     /** WindowManager.LayoutParams */
@@ -65,11 +65,9 @@ public class MonitorService extends Service {
     private float y;
     private int delaytime;
     private DecimalFormat fomart;
-    private MemoryInfo memoryInfo;
     private WifiManager wifiManager;
     private Handler handler = new Handler();
     private CpuInfo cpuInfo;
-    private String time;
     private boolean isFloating;
     /** 正在测试的APP Info */
     private ProcessInfo mCurProcessInfo;
@@ -85,7 +83,6 @@ public class MonitorService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        memoryInfo = new MemoryInfo();
         fomart = new DecimalFormat();
         fomart.setMaximumFractionDigits(2);
         fomart.setMinimumFractionDigits(0);
@@ -99,7 +96,11 @@ public class MonitorService extends Service {
         mCurProcessInfo = (ProcessInfo) intent.getExtras().getSerializable(KEY_PROCESS_INFO);
 
         cpuInfo = new CpuInfo(getBaseContext(), mCurProcessInfo.getPid(), Integer.toString(mCurProcessInfo.getUid()));
-        delaytime = Integer.parseInt(time) * 1000;
+        
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        isFloating = sp.getBoolean(SettingsActivity.KEY_FLOAT, true);
+        int time = sp.getInt(SettingsActivity.KEY_TIME, SettingsActivity.DEFAULT_DURATION);
+        delaytime = time * 1000;
         if (isFloating) {
             mFloatView = LayoutInflater.from(this).inflate(R.layout.floating, null);
             txtUnusedMem = (TextView) mFloatView.findViewById(R.id.memunused);
@@ -146,12 +147,12 @@ public class MonitorService extends Service {
             out = new FileOutputStream(resultFile);
             osw = new OutputStreamWriter(out, "utf-8");
             bw = new BufferedWriter(osw);
-            long totalMemorySize = memoryInfo.getTotalMemory();
+            long totalMemorySize = MemoryUtils.getTotalMemory();
             String totalMemory = fomart.format((double) totalMemorySize / 1024);
             bw.write("指定应用的CPU内存监控情况\r\n" + "应用包名：," + mCurProcessInfo.getPackageName() + "\r\n" + "应用名称: ,"
                     + mCurProcessInfo.getProcessName() + "\r\n" + "应用PID: ," + mCurProcessInfo.getPid() + "\r\n"
-                    + "机器内存大小(MB)：," + totalMemory + "MB\r\n" + "机器CPU型号：," + cpuInfo.getCpuName() + "\r\n"
-                    + "机器android系统版本：," + memoryInfo.getSDKVersion() + "\r\n" + "手机型号：," + memoryInfo.getPhoneType()
+                    + "机器内存大小(MB)：," + totalMemory + "MB\r\n" + "机器CPU型号：," + CpuInfo.getCpuName() + "\r\n"
+                    + "机器android系统版本：," + getSDKVersion() + "\r\n" + "手机型号：," + getPhoneType()
                     + "\r\n" + "UID：," + mCurProcessInfo.getUid() + "\r\n");
             bw.write("时间" + "," + "应用占用内存PSS(MB)" + "," + "应用占用内存比(%)" + "," + " 机器剩余内存(MB)" + "," + "应用占用CPU率(%)"
                     + "," + "CPU总使用率(%)" + "," + "流量(KB)：" + "\r\n");
@@ -256,8 +257,8 @@ public class MonitorService extends Service {
      * @throws IOException
      */
     private void dataRefresh() {
-        int pidMemory = memoryInfo.getPidMemorySize(mCurProcessInfo.getPid(), getBaseContext());
-        long freeMemory = memoryInfo.getFreeMemorySize(getBaseContext());
+        int pidMemory = MemoryUtils.getPidMemorySize(mCurProcessInfo.getPid(), getBaseContext());
+        long freeMemory = MemoryUtils.getFreeMemorySize(getBaseContext());
         String freeMemoryKb = fomart.format((double) freeMemory / 1024);
         String processMemory = fomart.format((double) pidMemory / 1024);
         ArrayList<String> processInfo = cpuInfo.getCpuRatioInfo();
@@ -285,10 +286,11 @@ public class MonitorService extends Service {
                 txtTotalMem.setText("占用CPU:" + processCpuRatio + "%" + ",总体CPU:" + totalCpuRatio + "%");
                 if (trafficSize.equals("-1")) {
                     txtTraffic.setText("本程序或本设备不支持流量统计");
-                } else if (isMb)
+                } else if (isMb) {
                     txtTraffic.setText("消耗流量:" + fomart.format(trafficMb) + "MB");
-                else
+                } else {
                     txtTraffic.setText("消耗流量:" + trafficSize + "KB");
+                }
             }
         }
     }
@@ -330,5 +332,23 @@ public class MonitorService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+    
+    /**
+     * get the sdk version of phone
+     * 
+     * @return sdk version
+     */
+    public String getSDKVersion() {
+        return android.os.Build.VERSION.RELEASE;
+    }
+
+    /**
+     * get phone type
+     * 
+     * @return phone type
+     */
+    public String getPhoneType() {
+        return android.os.Build.MODEL;
     }
 }

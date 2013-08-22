@@ -51,7 +51,7 @@ public class MonitorActivity extends BaseActivity implements OnCheckedChangeList
     private Intent mMonitorServiceIntent;
 
     /** 正在测试的APP Info */
-    private ProcessInfo mCurProcessInfo;
+    private ProcessInfo mProcessInfo;
 
     /** 可以进行测试 */
     private boolean isTesting = true;
@@ -80,18 +80,18 @@ public class MonitorActivity extends BaseActivity implements OnCheckedChangeList
     public void onClick(View v) {
         Button btnTest = (Button) v;
         if (isTesting) {
-            if (null != mCurProcessInfo) {
-                Intent intent = getPackageManager().getLaunchIntentForPackage(mCurProcessInfo.getPackageName());
+            if (null != mProcessInfo) {
+                Intent intent = getPackageManager().getLaunchIntentForPackage(mProcessInfo.getPackageName());
                 if (null == intent) {
                     Toast.makeText(MonitorActivity.this, R.string.select_fail_start, Toast.LENGTH_LONG).show();
                     return;
                 }
                 startActivity(intent);
-                waitForAppStart(mCurProcessInfo.getPackageName());
+                waitForAppStart(mProcessInfo.getPackageName());
                 
                 mMonitorServiceIntent = new Intent();
                 mMonitorServiceIntent.setClass(MonitorActivity.this, MonitorService.class);
-                mMonitorServiceIntent.putExtra(MonitorService.KEY_PROCESS_INFO, mCurProcessInfo);
+                mMonitorServiceIntent.putExtra(MonitorService.KEY_PROCESS_INFO, mProcessInfo);
                 startService(mMonitorServiceIntent);
                 
                 btnTest.setText(R.string.test_end);
@@ -125,6 +125,7 @@ public class MonitorActivity extends BaseActivity implements OnCheckedChangeList
             for (ProcessInfo processInfo : processes) {
                 if ((processInfo.getPackageName() != null) && (processInfo.getPackageName().equals(packageName))) {
                     if (processInfo.getPid() != 0) {
+                        isProcessStarted = true;
                         break;
                     }
                 }
@@ -204,13 +205,13 @@ public class MonitorActivity extends BaseActivity implements OnCheckedChangeList
         if (info.isSelected() != isChecked) {
             info.setIsSelected(isChecked);
             if (isChecked) {
-                if (null != mCurProcessInfo && !mCurProcessInfo.equals(info)) {
-                    mCurProcessInfo.setIsSelected(false);
+                if (null != mProcessInfo && !mProcessInfo.equals(info)) {
+                    mProcessInfo.setIsSelected(false);
                     mAdapter.notifyDataSetChanged();
                 }
-                mCurProcessInfo = info;
+                mProcessInfo = info;
             } else {
-                mCurProcessInfo = null;
+                mProcessInfo = null;
             }
         }
     }

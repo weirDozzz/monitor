@@ -12,47 +12,51 @@ import java.util.ArrayList;
 import java.util.Calendar;
 
 import seker.monitor.MonitorService;
-
 import android.content.Context;
-import android.util.Log;
 
-
+/**
+ * 监视CPU消耗
+ * 
+ * @author liuxinjian
+ * @since 2013-8-22
+ */
 public class CpuInfo {
 
-    private static final String TAG = "CpuInfo";
+    /** CPU信息文件的路径 */
+    public static final String CPUC_INFO_PATH = "/proc/cpuinfo";
+    /** 状态信息文件的路径 */
+    public static final String STAT_PATH = "/proc/stat";
 
+    /** Context */
     private Context mContext;
-    
+
     private long mProcessCpu;
     private long mIdleCpu;
     private long mTotalCpu;
-    private long mTotalCpu2;
+    
     private long mProcessCpu2;
     private long mIdleCpu2;
-    
+    private long mTotalCpu2;
+
     private boolean mIsInitialStatics = true;
-    private final static SimpleDateFormat sFormatterFile = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    private MemoryInfo mMemInfo;
+    private SimpleDateFormat sFormatterFile = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     private long mTotalMemorySize;
-    
-    private TrafficInfo trafficInfo;
+
     private long mInitialTraffic;
     private long mLastestTraffic;
     private long mTraffic;
 
-    private ArrayList<String> mCpuUsedRatio;
     private String mProcessCpuRatio = "";
     private String mTotalCpuRatio = "";
-    
+
     private int mPid;
+    private String mUid;
 
     public CpuInfo(Context context, int pid, String uid) {
         mContext = context;
         mPid = pid;
-        trafficInfo = new TrafficInfo(uid);
-        mMemInfo = new MemoryInfo();
-        mTotalMemorySize = mMemInfo.getTotalMemory();
-        mCpuUsedRatio = new ArrayList<String>();
+        mUid = uid;
+        mTotalMemorySize = MemoryUtils.getTotalMemory();
     }
 
     /**
@@ -60,7 +64,7 @@ public class CpuInfo {
      * 
      * @throws FileNotFoundException
      */
-    public void readCpuStat() {
+    private void readCpuStat() {
         String processPid = Integer.toString(mPid);
         String cpuStatPath = "/proc/" + processPid + "/stat";
         try {
@@ -76,7 +80,6 @@ public class CpuInfo {
             mProcessCpu = Long.parseLong(tok[13]) + Long.parseLong(tok[14]);
             processCpuInfo.close();
         } catch (FileNotFoundException e) {
-            Log.e(TAG, "FileNotFoundException: " + e.getMessage());
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
@@ -84,11 +87,11 @@ public class CpuInfo {
 
         try {
             // monitor total and idle cpu stat of certain process
-            RandomAccessFile cpuInfo = new RandomAccessFile("/proc/stat", "r");
+            RandomAccessFile cpuInfo = new RandomAccessFile(STAT_PATH, "r");
             String[] toks = cpuInfo.readLine().split(" ");
             mIdleCpu = Long.parseLong(toks[5]);
             mTotalCpu = Long.parseLong(toks[2]) + Long.parseLong(toks[3]) + Long.parseLong(toks[4])
-                    + Long.parseLong(toks[6]) + Long.parseLong(toks[5]) + Long.parseLong(toks[7])
+                    + Long.parseLong(toks[5]) + Long.parseLong(toks[6]) + Long.parseLong(toks[7])
                     + Long.parseLong(toks[8]);
             cpuInfo.close();
         } catch (FileNotFoundException e) {
@@ -103,14 +106,14 @@ public class CpuInfo {
      * 
      * @return CPU name
      */
-    public String getCpuName() {
+    public static String getCpuName() {
         try {
-            RandomAccessFile cpu_stat = new RandomAccessFile("/proc/cpuinfo", "r");
+            RandomAccessFile cpu_stat = new RandomAccessFile(CPUC_INFO_PATH, "r");
             String[] cpu = cpu_stat.readLine().split(":"); // cpu信息的前一段是含有processor字符串，此处替换为不显示
             cpu_stat.close();
             return cpu[1];
         } catch (IOException e) {
-            Log.e(TAG, "IOException: " + e.getMessage());
+            e.printStackTrace();
         }
         return "";
     }
@@ -123,35 +126,35 @@ public class CpuInfo {
      *         certain interval
      */
     public ArrayList<String> getCpuRatioInfo() {
-
         DecimalFormat fomart = new DecimalFormat();
         fomart.setMaximumFractionDigits(2);
         fomart.setMinimumFractionDigits(2);
 
         readCpuStat();
-        mCpuUsedRatio.clear();
-
+        ArrayList<String> cpuUsedRatio = new ArrayList<String>();
         try {
             Calendar cal = Calendar.getInstance();
             String mDateTime2 = sFormatterFile.format(cal.getTime().getTime() + 8 * 60 * 60 * 1000);
 
             if (mIsInitialStatics == true) {
-                mInitialTraffic = trafficInfo.getTrafficInfo();
+                mInitialTraffic = TrafficUtils.getTrafficInfo(mUid);
                 mIsInitialStatics = false;
             } else {
-                mLastestTraffic = trafficInfo.getTrafficInfo();
-                if (mInitialTraffic == -1)
+                mLastestTraffic = TrafficUtils.getTrafficInfo(mUid);
+                if (mInitialTraffic == -1) {
                     mTraffic = -1;
-                else
-                    mTraffic = (mLastestTraffic - mInitialTraffic + 1023) / 1024;
-                mProcessCpuRatio = fomart
-                        .format(100 * ((double) (mProcessCpu - mProcessCpu2) / (double) (mTotalCpu - mTotalCpu2)));
-                mTotalCpuRatio = fomart
-                        .format(100 * ((double) ((mTotalCpu - mIdleCpu) - (mTotalCpu2 - mIdleCpu2)) / (double) (mTotalCpu - mTotalCpu2)));
-                long pidMemory = mMemInfo.getPidMemorySize(mPid, mContext);
-                String pMemory = fomart.format((double) pidMemory / 1024);
-                long freeMemory = mMemInfo.getFreeMemorySize(mContext);
-                String fMemory = fomart.format((double) freeMemory / 1024);
+                } else {
+                    mTraffic = (mLastestTraffic - mInitialTraffic + 1023) / MemoryUtils.KB;
+                }
+                mProcessCpuRatio = fomart.format(100 * ((double) (mProcessCpu - mProcessCpu2) / (double) (mTotalCpu - mTotalCpu2)));
+                mTotalCpuRatio = fomart.format(100 * ((double) ((mTotalCpu - mIdleCpu) - (mTotalCpu2 - mIdleCpu2)) / (double) (mTotalCpu - mTotalCpu2)));
+                
+                long pidMemory = MemoryUtils.getPidMemorySize(mPid, mContext);
+                String pMemory = fomart.format((double) pidMemory / MemoryUtils.KB);
+                
+                long freeMemory = MemoryUtils.getFreeMemorySize(mContext);
+                String fMemory = fomart.format((double) freeMemory / MemoryUtils.KB);
+                
                 String percent = "统计出错";
                 if (mTotalMemorySize != 0) {
                     percent = fomart.format(((double) pidMemory / (double) mTotalMemorySize) * 100);
@@ -159,25 +162,21 @@ public class CpuInfo {
 
                 // whether certain device supports mTraffic statics
                 if (mTraffic == -1) {
-                    MonitorService.bw.write(mDateTime2 + "," + pMemory + "," + percent + "," + fMemory + ","
-                            + mProcessCpuRatio + "," + mTotalCpuRatio + "," + "本程序或本设备不支持流量统计" + "\r\n");
+                    MonitorService.bw.write(mDateTime2 + "," + pMemory + "," + percent + "," + fMemory + "," + mProcessCpuRatio + "," + mTotalCpuRatio + "," + "本程序或本设备不支持流量统计" + "\r\n");
                 } else {
-                    MonitorService.bw.write(mDateTime2 + "," + pMemory + "," + percent + "," + fMemory + ","
-                            + mProcessCpuRatio + "," + mTotalCpuRatio + "," + mTraffic + "\r\n");
+                    MonitorService.bw.write(mDateTime2 + "," + pMemory + "," + percent + "," + fMemory + "," + mProcessCpuRatio + "," + mTotalCpuRatio + "," + mTraffic + "\r\n");
                 }
             }
             mTotalCpu2 = mTotalCpu;
             mProcessCpu2 = mProcessCpu;
             mIdleCpu2 = mIdleCpu;
-            mCpuUsedRatio.add(mProcessCpuRatio);
-            mCpuUsedRatio.add(mTotalCpuRatio);
-            mCpuUsedRatio.add(String.valueOf(mTraffic));
+            cpuUsedRatio.add(mProcessCpuRatio);
+            cpuUsedRatio.add(mTotalCpuRatio);
+            cpuUsedRatio.add(String.valueOf(mTraffic));
         } catch (IOException e) {
             e.printStackTrace();
-            // PttService.closeOpenedStream()
         }
-        return mCpuUsedRatio;
-
+        return cpuUsedRatio;
     }
 
     // TODO coming soon
